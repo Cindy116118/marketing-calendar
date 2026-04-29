@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>德克士行销日历 - 营运执行手册可视化</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --primary-green: #00A651;
+    --primary-green-dark: #008C44;
+    --primary-green-light: #E6F7EF;
+    --accent-orange: #FF6B00;
+    --accent-orange-light: #FFF0E6;
+    --bg-cream: #FAFBF7;
+    --text-dark: #1A1A1A;
+    --text-gray: #666666;
+    --border-light: #E8E8E8;
+    --brand-red: #E60012;
+  }
+  body { font-family: 'Noto Sans SC', sans-serif; background: var(--bg-cream); }
+  .brand-green { color: var(--primary-green); }
+  .bg-brand-green { background-color: var(--primary-green); }
+  .bg-brand-green-dark { background-color: var(--primary-green-dark); }
+  .bg-brand-green-light { background-color: var(--primary-green-light); }
+  .brand-orange { color: var(--accent-orange); }
+  .bg-brand-orange { background-color: var(--accent-orange); }
+  .bg-brand-orange-light { background-color: var(--accent-orange-light); }
+  .calendar-day { min-height: 100px; transition: all 0.2s; }
+  .calendar-day:hover { background: #f0f0f0; }
+  .event-chip { cursor: pointer; transition: transform 0.15s; }
+  .event-chip:hover { transform: scale(1.03); }
+  .timeline-line { position: absolute; left: 20px; top: 0; bottom: 0; width: 3px; background: linear-gradient(to bottom, var(--primary-green), var(--accent-orange)); border-radius: 2px; }
+  .glass-card { background: rgba(255,255,255,0.85); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.5); }
+  .tab-active { border-bottom: 3px solid var(--primary-green); color: var(--primary-green); font-weight: 700; }
+  .module-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+  .scroll-hide::-webkit-scrollbar { display: none; }
+  .scroll-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  .animate-fade-in { animation: fadeIn 0.4s ease-out; }
+  @keyframes slideIn { from { opacity: 0; transform: translateX(-20px); } to { opacity: 1; transform: translateX(0); } }
+  .animate-slide-in { animation: slideIn 0.3s ease-out; }
+  .modal-overlay { background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); }
+</style>
+</head>
+<body class="min-h-screen">
+
+<!-- Header -->
+<header class="bg-white border-b sticky top-0 z-40">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-brand-green flex items-center justify-center text-white font-bold text-lg">D</div>
+      <div>
+        <h1 class="text-lg font-bold text-gray-900 leading-tight">德克士 行销日历</h1>
+        <p class="text-xs text-gray-500">营运执行手册可视化系统</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <select id="periodSelect" class="px-3 py-1.5 text-sm border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-green-500">
+        <option value="2026-04">2026年 4-5月档期</option>
+        <option value="2025-10">2025年 10-11月档期</option>
+      </select>
+      <button onclick="toggleView('calendar')" id="btnCalendar" class="px-3 py-1.5 text-sm rounded-lg bg-brand-green text-white font-medium">日历</button>
+      <button onclick="toggleView('timeline')" id="btnTimeline" class="px-3 py-1.5 text-sm rounded-lg bg-gray-100 text-gray-700 font-medium">时间线</button>
+      <button onclick="toggleView('modules')" id="btnModules" class="px-3 py-1.5 text-sm rounded-lg bg-gray-100 text-gray-700 font-medium">功能模块</button>
+    </div>
+  </div>
+</header>
+
+<!-- Filter Bar -->
+<div class="bg-white border-b sticky top-[57px] z-30">
+  <div class="max-w-7xl mx-auto px-4 py-2 flex items-center gap-2 overflow-x-auto scroll-hide">
+    <span class="text-xs text-gray-400 whitespace-nowrap">筛选:</span>
+    <button onclick="filterEvents('all')" class="filter-btn px-3 py-1 text-xs rounded-full bg-brand-green text-white font-medium whitespace-nowrap" data-filter="all">全部</button>
+    <button onclick="filterEvents('brand')" class="filter-btn px-3 py-1 text-xs rounded-full bg-gray-100 text-gray-600 whitespace-nowrap" data-filter="brand">品牌行销</button>
+    <button onclick="filterEvents('user')" class="filter-btn px-3 py-1 text-xs rounded-full bg-gray-100 text-gray-600 whitespace-nowrap" data-filter="user">用户运营</button>
+    <button onclick="filterEvents('delivery')" class="filter-btn px-3 py-1 text-xs rounded-full bg-gray-100 text-gray-600 whitespace-nowrap" data-filter="delivery">外卖运营</button>
+    <button onclick="filterEvents('training')" class="filter-btn px-3 py-1 text-xs rounded-full bg-gray-100 text-gray-600 whitespace-nowrap" data-filter="training">营运训练</button>
+    <button onclick="filterEvents('product')" class="filter-btn px-3 py-1 text-xs rounded-full bg-gray-100 text-gray-600 whitespace-nowrap" data-filter="product">产品上市</button>
+  </div>
+</div>
+
+<!-- Main Content -->
+<main class="max-w-7xl mx-auto px-4 py-6">
+
+  <!-- Summary Cards -->
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+    <div class="glass-card rounded-xl p-4 border">
+      <div class="text-xs text-gray-500 mb-1">档期总目标</div>
+      <div class="text-xl font-bold brand-green">7.3亿</div>
+      <div class="text-xs text-gray-400">同期成长 12%</div>
+    </div>
+    <div class="glass-card rounded-xl p-4 border">
+      <div class="text-xs text-gray-500 mb-1">新品数量</div>
+      <div class="text-xl font-bold brand-orange">4款</div>
+      <div class="text-xs text-gray-400">LTO + 常态优化</div>
+    </div>
+    <div class="glass-card rounded-xl p-4 border">
+      <div class="text-xs text-gray-500 mb-1">核心活动周</div>
+      <div class="text-xl font-bold text-blue-600">5周</div>
+      <div class="text-xs text-gray-400">4/19 - 5/24</div>
+    </div>
+    <div class="glass-card rounded-xl p-4 border">
+      <div class="text-xs text-gray-500 mb-1">关键节点</div>
+      <div class="text-xl font-bold text-purple-600">8个</div>
+      <div class="text-xs text-gray-400">品牌日/假期/上新</div>
+    </div>
+  </div>
+
+  <!-- Calendar View -->
+  <div id="calendarView" class="animate-fade-in">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-bold text-gray-900" id="calendarTitle">2026年 4月</h2>
+      <div class="flex items-center gap-2">
+        <button onclick="changeMonth(-1)" class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600">←</button>
+        <button onclick="changeMonth(1)" class="p-1.5 rounded-lg hover:bg-gray-100 text-gray-600">→</button>
+      </div>
+    </div>
+    <div class="bg-white rounded-xl border overflow-hidden">
+      <div class="grid grid-cols-7 bg-gray-50 border-b">
+        <div class="py-2 text-center text-xs font-medium text-gray-500">日</div>
+        <div class="py-2 text-center text-xs font-medium text-gray-500">一</div>
+        <div class="py-2 text-center text-xs font-medium text-gray-500">二</div>
+        <div class="py-2 text-center text-xs font-medium text-gray-500">三</div>
+        <div class="py-2 text-center text-xs font-medium text-gray-500">四</div>
+        <div class="py-2 text-center text-xs font-medium text-gray-500">五</div>
+        <div class="py-2 text-center text-xs font-medium text-gray-500">六</div>
+      </div>
+      <div id="calendarGrid" class="grid grid-cols-7"></div>
+    </div>
+  </div>
+
+  <!-- Timeline View -->
+  <div id="timelineView" class="hidden animate-fade-in">
+    <h2 class="text-lg font-bold text-gray-900 mb-4">档期执行时间线</h2>
+    <div class="relative pl-8 space-y-4" id="timelineContainer"></div>
+  </div>
+
+  <!-- Modules View -->
+  <div id="modulesView" class="hidden animate-fade-in">
+    <h2 class="text-lg font-bold text-gray-900 mb-4">抽象功能模块</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="modulesGrid"></div>
+  </div>
+
+</main>
+
+<!-- Event Detail Modal -->
+<div id="eventModal" class="fixed inset-0 z-50 hidden">
+  <div class="modal-overlay absolute inset-0" onclick="closeModal()"></div>
+  <div class="absolute inset-x-4 top-[10%] md:inset-x-auto md:left-1/2 md:-translate-x-1/2 md:w-[560px] bg-white rounded-2xl shadow-2xl max-h-[80vh] overflow-hidden flex flex-col">
+    <div class="p-5 border-b flex items-start justify-between">
+      <div>
+        <div class="flex items-center gap-2 mb-1">
+          <span id="modalBadge" class="module-badge"></span>
+          <span id="modalDate" class="text-xs text-gray-500"></span>
+        </div>
+        <h3 id="modalTitle" class="text-lg font-bold text-gray-900"></h3>
+      </div>
+      <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+    </div>
+    <div id="modalBody" class="p-5 overflow-y-auto"></div>
+  </div>
+</div>
+
+<script>
+// ============ DATA ============
+const periodData = {
+  '2026-04': {
+    name: '2026年 4-5月档期',
+    target: '7.3亿',
+    growth: '12%',
+    newProducts: 4,
+    weeks: 5,
+    nodes: 8,
+    startDate: '2026-04-01',
+    endDate: '2026-05-31',
+    events: [
+      { date: '2026-04-01', title: 'Q2费率调整生效', type: 'delivery', desc: '公域平台抽佣费率调整为6%，公域侧利润有利1~1.5%', tag: '费率调整' },
+      { date: '2026-04-04', title: '清明节会员券发放', type: 'user', desc: '打开即得：26.9元小食四拼盒、24.9元汉堡四选二、12.9元青柠饮2杯', tag: '会员券' },
+      { date: '2026-04-08', title: '逢8会员日', type: 'user', desc: '王牌产品+1元得2件，培养会员消费心智', tag: '逢8' },
+      { date: '2026-04-15', title: '30周年焕新盛典（内部）', type: 'brand', desc: '上海旗舰店 30周年焕新盛典，本社员工&合作方参与', tag: '大事件' },
+      { date: '2026-04-18', title: '发布会预热邀请', type: 'brand', desc: '外部发布会预热邀请-制造悬念', tag: '预热' },
+      { date: '2026-04-19', title: '30周年品牌焕新官宣', type: 'brand', desc: '4/19-5/24主档期开启，周周惊喜价13.9元，新版LOGO、包装、IP酷宝正式登场', tag: '档期开端' },
+      { date: '2026-04-19', title: '粉丝品鉴会（外部）', type: 'brand', desc: '12:00-16:00 粉丝品鉴会，TOP携小鸟悬念预热', tag: '大事件' },
+      { date: '2026-04-19', title: '抖音30周年大场直播', type: 'brand', desc: '4/19-4/21 抖音30周年大场直播开启', tag: '直播' },
+      { date: '2026-04-19', title: 'Week1 手枪腿周周价', type: 'product', desc: '4/19-4/26 咔滋脆皮手枪腿 13.9元', tag: '周周惊喜价' },
+      { date: '2026-04-20', title: '档期上新日', type: 'product', desc: '嫩汁汁四方腿、韩式烧烤牛肉黄金米汉堡LTO、粉桃三重奏柠檬茶LTO、抹茶白玉鲷鱼烧LTO', tag: '新品上市' },
+      { date: '2026-04-21', title: '淘闪品类冠名', type: 'delivery', desc: '淘宝闪购品类冠名日', tag: '三方活动' },
+      { date: '2026-04-22', title: '活动现场传播', type: 'brand', desc: '活动现场视频+图文采集集锦-持续传播', tag: '传播' },
+      { date: '2026-04-25', title: '五一会员券发放', type: 'user', desc: '打开即得：42.9元双人餐7件套、13.9元圣代两份', tag: '会员券' },
+      { date: '2026-04-26', title: 'PR深度复盘稿', type: 'brand', desc: '专业视角深度解码酷宝IP及脆脆日品牌精神', tag: 'PR' },
+      { date: '2026-04-27', title: 'Week2 米汉堡周周价', type: 'product', desc: '4/27-4/30 安格斯厚牛黄金米汉堡 13.9元，TOP站肩鸟海报上线', tag: '周周惊喜价' },
+      { date: '2026-04-28', title: '淘闪品类冠名', type: 'delivery', desc: '淘宝闪购品类冠名日', tag: '三方活动' },
+      { date: '2026-04-30', title: 'AIGC地标视频发布', type: 'brand', desc: '北京、上海、重庆 AIGC地标视频发布', tag: '创意' },
+      { date: '2026-05-01', title: '五一假期开始', type: 'brand', desc: '5/1-5/5 五一假期，30周年狂欢桶（10件套）59.9元', tag: '假期' },
+      { date: '2026-05-01', title: '五一桶激励开始', type: 'delivery', desc: '59.9元30周年狂欢桶销售激励，以10万撬动211万生意增量', tag: '激励' },
+      { date: '2026-05-05', title: '五一假期结束', type: 'brand', desc: '五一假期结束，520 TOP饭撒视频发布预热', tag: '假期' },
+      { date: '2026-05-06', title: 'Week3 四方腿周周价', type: 'product', desc: '5/6-5/10 嫩汁汁四方腿*2 13.9元', tag: '周周惊喜价' },
+      { date: '2026-05-07', title: '脆脆日12周年', type: 'training', desc: '5月7日 6:00-10:00 全国门店闭店4小时修炼炸鸡术', tag: '脆脆日' },
+      { date: '2026-05-11', title: 'Week4 菠萝堡周周价', type: 'product', desc: '5/11-5/17 火山菠萝堡 13.9元', tag: '周周惊喜价' },
+      { date: '2026-05-18', title: 'Week5 咖喱饭周周价', type: 'product', desc: '5/18-5/24 椰香咖喱鸡腿排饭 13.9元', tag: '周周惊喜价' },
+      { date: '2026-05-20', title: '520 TOP饭撒视频', type: 'brand', desc: '520 TOP饭撒视频，号召粉丝最后两天线下品尝', tag: '传播' },
+      { date: '2026-05-24', title: '档期结束', type: 'brand', desc: '30周年档期结束，儿童节档期预热', tag: '档期结束' },
+      { date: '2026-05-25', title: '儿童节档期预热', type: 'brand', desc: '儿童节档期准备，芝麻脆脆鸡块LTO等', tag: '新档期' }
+    ]
+  },
+  '2025-10': {
+    name: '2025年 10-11月档期',
+    target: '11.5亿',
+    growth: '12%',
+    newProducts: 6,
+    weeks: 9,
+    nodes: 10,
+    startDate: '2025-09-15',
+    endDate: '2025-11-30',
+    events: [
+      { date: '2025-09-15', title: '鸡排饭新品上线', type: 'product', desc: '卤香炸鸡排饭、椰香咖喱炸鸡排饭上线', tag: '新品上市' },
+      { date: '2025-09-16', title: '新品线上培训', type: 'training', desc: '9月16日前完成全国地区线上培训', tag: '培训' },
+      { date: '2025-09-26', title: '社群系统上线准备', type: 'user', desc: '系统部署+对接，店长中心化托管', tag: '系统升级' },
+      { date: '2025-09-28', title: '榴莲堡重磅上新', type: 'product', desc: '榴莲双响炮脆皮鸡腿堡上市，餐厅电话抽查', tag: '新品上市' },
+      { date: '2025-09-29', title: '国庆档期货盘启动', type: 'brand', desc: '9/29-10/8 国庆+中秋，主推79元&109元桶餐，29.9元2个汉堡', tag: '假期' },
+      { date: '2025-09-29', title: '热奶茶系列切换', type: 'product', desc: '大红袍奶茶/黑糖波波奶茶 冷切热', tag: '常态优化' },
+      { date: '2025-10-01', title: '新社群系统上线', type: 'user', desc: '中央化托管运营，会员&社群数据对接', tag: '系统升级' },
+      { date: '2025-10-01', title: 'TOP痛楼应援开启', type: 'brand', desc: '重庆TOP少年团痛楼应援，寻香打卡路线', tag: '大事件' },
+      { date: '2025-10-01', title: '国庆高铁广告投放', type: 'brand', desc: '成都东/杭州东/昆明/西安/郑州/贵阳北站候车厅广告', tag: '户外广告' },
+      { date: '2025-10-08', title: '国庆档结束', type: 'brand', desc: '国庆高AC套餐结束，进入非假期运营模式', tag: '假期' },
+      { date: '2025-10-09', title: '新品稽核开始', type: 'training', desc: '10月9日起进行线上线下无预警稽核', tag: '稽核' },
+      { date: '2025-10-09', title: '鸡排饭两件套25.9元', type: 'product', desc: '10/9-10/31 新品限时特惠，会员券加码20.9元', tag: '促销' },
+      { date: '2025-10-10', title: '抖音随心团上线', type: 'delivery', desc: '抖音随心团外卖券点餐闭环，预估首月破百万', tag: '新渠道' },
+      { date: '2025-10-14', title: '一路繁花综艺曝光', type: 'brand', desc: '爱奇艺S+级综艺《一路繁花》植入曝光', tag: '综艺' },
+      { date: '2025-10-15', title: '门店物料更换', type: 'user', desc: '店外A展架、桌码、餐垫纸、DM单统一更换', tag: '物料' },
+      { date: '2025-10-15', title: '圈粉链路调整', type: 'user', desc: '添加企微福利官→加群领新人礼→用券下单', tag: '链路优化' },
+      { date: '2025-10-31', title: '珍珠米汉堡上市', type: 'product', desc: '延吉风味煎鸡腿珍珠米汉堡、安格斯厚牛珍珠米汉堡上市，美团独家首发7天', tag: '新品上市' },
+      { date: '2025-10-31', title: '茉莉轻乳茶上市', type: 'product', desc: '茉莉轻乳茶（热）LTO新品上市', tag: '新品上市' },
+      { date: '2025-10-31', title: '常态汉堡切换', type: 'product', desc: '两款Core Burger面包切换为芝麻全麦面包，Q虾鸡排双拼堡下架', tag: '常态优化' },
+      { date: '2025-10-31', title: '美团秒提上线', type: 'delivery', desc: '美团秒提10.31上线，卡券站内核销闭环', tag: '新渠道' },
+      { date: '2025-11-01', title: '双11大促开启', type: 'delivery', desc: '抖音/快手/天猫双11活动，11.11元1+1两件套引流', tag: '大促' },
+      { date: '2025-11-07', title: '米汉堡全渠道上线', type: 'product', desc: '自外送/饿了么/京东米汉堡延迟一周后上线', tag: '渠道扩展' },
+      { date: '2025-11-07', title: '立冬节气营销', type: 'user', desc: '节气营销节点，推送热饮及暖食券', tag: '节气' },
+      { date: '2025-11-12', title: '炸鸡狂享节', type: 'delivery', desc: '主推49元炸鸡桶一周年回归', tag: '活动' },
+      { date: '2025-11-22', title: '小雪节气营销', type: 'user', desc: '节气营销节点', tag: '节气' },
+      { date: '2025-11-24', title: '感恩节活动', type: 'user', desc: '感恩节营销节点', tag: '节气' },
+      { date: '2025-11-27', title: '感恩节', type: 'user', desc: '感恩节当天推送', tag: '节气' },
+      { date: '2025-11-30', title: '档期结束', type: 'brand', desc: '10-11月档期结束', tag: '档期结束' }
+    ]
+  }
+};
+
+const moduleDefinitions = [
+  { id: 'performance', name: '业绩仪表盘', icon: '📊', desc: '业绩回顾、目标设定、达成率追踪、地区别表现分析', color: 'bg-blue-50 text-blue-700' },
+  { id: 'calendar', name: '档期日历', icon: '📅', desc: '档期时间线、关键节点、活动排期、假期标注', color: 'bg-green-50 text-green-700' },
+  { id: 'product', name: '产品生命周期', icon: '🍔', desc: '新品上市、LTO管理、常态优化、产品退市、成本管控', color: 'bg-orange-50 text-orange-700' },
+  { id: 'pricing', name: '货盘与价格', icon: '💰', desc: '各渠道货盘机制、套餐组合、定价策略、折扣率、成促率', color: 'bg-purple-50 text-purple-700' },
+  { id: 'marketing', name: '营销活动', icon: '📢', desc: '品牌活动、IP联名、媒体投放、达人种草、直播、大事件', color: 'bg-pink-50 text-pink-700' },
+  { id: 'material', name: '物料管理', icon: '🎨', desc: 'POSM、窗贴、DMB、包材、周边、门店布置', color: 'bg-yellow-50 text-yellow-700' },
+  { id: 'member', name: '会员与社群', icon: '👥', desc: '付费会员、社群运营、私域券、企微、逢8会员日', color: 'bg-cyan-50 text-cyan-700' },
+  { id: 'delivery', name: '外卖平台', icon: '🛵', desc: '三方平台（美团/饿了么/京东）、自有平台、费率、履约', color: 'bg-indigo-50 text-indigo-700' },
+  { id: 'training', name: '训练与稽核', icon: '📚', desc: '新品培训、物料说明、操作规范、电话抽查、无预警稽核', color: 'bg-red-50 text-red-700' },
+  { id: 'tracking', name: '执行追踪', icon: '✅', desc: '门店执行检查、物料陈列、口促追踪、问题回馈闭环', color: 'bg-teal-50 text-teal-700' }
+];
+
+const typeConfig = {
+  brand: { label: '品牌行销', color: 'bg-pink-100 text-pink-700 border-pink-200', badge: 'bg-pink-500' },
+  user: { label: '用户运营', color: 'bg-cyan-100 text-cyan-700 border-cyan-200', badge: 'bg-cyan-500' },
+  delivery: { label: '外卖运营', color: 'bg-indigo-100 text-indigo-700 border-indigo-200', badge: 'bg-indigo-500' },
+  training: { label: '营运训练', color: 'bg-red-100 text-red-700 border-red-200', badge: 'bg-red-500' },
+  product: { label: '产品上市', color: 'bg-orange-100 text-orange-700 border-orange-200', badge: 'bg-orange-500' }
+};
+
+// ============ STATE ============
+let currentPeriod = '2026-04';
+let currentView = 'calendar';
+let currentMonth = 3; // April = 3 (0-indexed)
+let currentYear = 2026;
+let activeFilter = 'all';
+
+// ============ INIT ============
+function init() {
+  document.getElementById('periodSelect').value = currentPeriod;
+  document.getElementById('periodSelect').addEventListener('change', (e) => {
+    currentPeriod = e.target.value;
+    if (currentPeriod === '2026-04') { currentYear = 2026; currentMonth = 3; }
+    else { currentYear = 2025; currentMonth = 9; }
+    updateSummary();
+    renderView();
+  });
+  updateSummary();
+  renderCalendar();
+  renderTimeline();
+  renderModules();
+}
+
+function updateSummary() {
+  const data = periodData[currentPeriod];
+  const cards = document.querySelectorAll('.glass-card');
+  cards[0].querySelector('.text-xl').textContent = data.target;
+  cards[0].querySelector('.text-xs.text-gray-400').textContent = `同期成长 ${data.growth}`;
+  cards[1].querySelector('.text-xl').textContent = data.newProducts + '款';
+  cards[2].querySelector('.text-xl').textContent = data.weeks + '周';
+  cards[3].querySelector('.text-xl').textContent = data.nodes + '个';
+}
+
+// ============ VIEW TOGGLE ============
+function toggleView(view) {
+  currentView = view;
+  document.getElementById('calendarView').classList.add('hidden');
+  document.getElementById('timelineView').classList.add('hidden');
+  document.getElementById('modulesView').classList.add('hidden');
+  document.getElementById(view + 'View').classList.remove('hidden');
+
+  document.getElementById('btnCalendar').className = view === 'calendar' ? 'px-3 py-1.5 text-sm rounded-lg bg-brand-green text-white font-medium' : 'px-3 py-1.5 text-sm rounded-lg bg-gray-100 text-gray-700 font-medium';
+  document.getElementById('btnTimeline').className = view === 'timeline' ? 'px-3 py-1.5 text-sm rounded-lg bg-brand-green text-white font-medium' : 'px-3 py-1.5 text-sm rounded-lg bg-gray-100 text-gray-700 font-medium';
+  document.getElementById('btnModules').className = view === 'modules' ? 'px-3 py-1.5 text-sm rounded-lg bg-brand-green text-white font-medium' : 'px-3 py-1.5 text-sm rounded-lg bg-gray-100 text-gray-700 font-medium';
+}
+
+function renderView() {
+  if (currentView === 'calendar') renderCalendar();
+  if (currentView === 'timeline') renderTimeline();
+}
+
+// ============ FILTER ============
+function filterEvents(type) {
+  activeFilter = type;
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    if (btn.dataset.filter === type) {
+      btn.className = 'filter-btn px-3 py-1 text-xs rounded-full bg-brand-green text-white font-medium whitespace-nowrap';
+    } else {
+      btn.className = 'filter-btn px-3 py-1 text-xs rounded-full bg-gray-100 text-gray-600 whitespace-nowrap';
+    }
+  });
+  renderCalendar();
+  renderTimeline();
+}
+
+function getFilteredEvents() {
+  const events = periodData[currentPeriod].events;
+  if (activeFilter === 'all') return events;
+  return events.filter(e => e.type === activeFilter);
+}
+
+// ============ CALENDAR ============
+function renderCalendar() {
+  const grid = document.getElementById('calendarGrid');
+  grid.innerHTML = '';
+  document.getElementById('calendarTitle').textContent = `${currentYear}年 ${currentMonth + 1}月`;
+
+  const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+  // Empty cells
+  for (let i = 0; i < firstDay; i++) {
+    grid.innerHTML += '<div class="calendar-day border-b border-r bg-gray-50/50"></div>';
+  }
+
+  const events = getFilteredEvents();
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const dayEvents = events.filter(e => e.date === dateStr);
+    const isToday = false; // Could check against real date
+    const isWeekend = (firstDay + day - 1) % 7 === 0 || (firstDay + day - 1) % 7 === 6;
+
+    let html = `<div class="calendar-day border-b border-r p-1 ${isWeekend ? 'bg-orange-50/30' : ''}">`;
+    html += `<div class="text-xs font-medium ${isToday ? 'text-white bg-brand-green rounded-full w-6 h-6 flex items-center justify-center' : 'text-gray-700'} mb-1">${day}</div>`;
+
+    dayEvents.slice(0, 3).forEach(ev => {
+      const cfg = typeConfig[ev.type];
+      html += `<div class="event-chip text-[10px] truncate px-1.5 py-0.5 rounded mb-0.5 ${cfg.color}" onclick="showEventDetail('${ev.date}', '${ev.title.replace(/'/g, "\\'")}')">${ev.tag}</div>`;
+    });
+    if (dayEvents.length > 3) {
+      html += `<div class="text-[10px] text-gray-400 pl-1">+${dayEvents.length - 3} 更多</div>`;
+    }
+
+    html += '</div>';
+    grid.innerHTML += html;
+  }
+
+  // Fill remaining cells
+  const totalCells = firstDay + daysInMonth;
+  const remaining = 35 - totalCells;
+  for (let i = 0; i < remaining; i++) {
+    grid.innerHTML += '<div class="calendar-day border-b border-r bg-gray-50/50"></div>';
+  }
+}
+
+function changeMonth(delta) {
+  currentMonth += delta;
+  if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+  if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+  renderCalendar();
+}
+
+// ============ TIMELINE ============
+function renderTimeline() {
+  const container = document.getElementById('timelineContainer');
+  const events = getFilteredEvents();
+
+  let html = '<div class="timeline-line"></div>';
+  events.forEach((ev, idx) => {
+    const cfg = typeConfig[ev.type];
+    const date = new Date(ev.date);
+    const dateLabel = `${date.getMonth() + 1}/${date.getDate()}`;
+    html += `
+      <div class="relative animate-slide-in" style="animation-delay: ${idx * 0.05}s">
+        <div class="absolute -left-8 top-1 w-4 h-4 rounded-full border-2 border-white ${cfg.badge} shadow-sm"></div>
+        <div class="glass-card rounded-xl p-4 border ml-2 hover:shadow-md transition-shadow">
+          <div class="flex items-start justify-between mb-2">
+            <div class="flex items-center gap-2">
+              <span class="module-badge ${cfg.color}">${cfg.label}</span>
+              <span class="text-xs text-gray-400">${dateLabel}</span>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">${ev.tag}</span>
+          </div>
+          <h4 class="font-bold text-gray-900 text-sm mb-1">${ev.title}</h4>
+          <p class="text-xs text-gray-600 leading-relaxed">${ev.desc}</p>
+        </div>
+      </div>
+    `;
+  });
+  container.innerHTML = html;
+}
+
+// ============ MODULES ============
+function renderModules() {
+  const grid = document.getElementById('modulesGrid');
+  grid.innerHTML = moduleDefinitions.map(m => `
+    <div class="glass-card rounded-xl p-5 border hover:shadow-lg transition-shadow">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="w-10 h-10 rounded-lg ${m.color} flex items-center justify-center text-xl">${m.icon}</div>
+        <h3 class="font-bold text-gray-900">${m.name}</h3>
+      </div>
+      <p class="text-sm text-gray-600 leading-relaxed">${m.desc}</p>
+    </div>
+  `).join('');
+}
+
+// ============ MODAL ============
+function showEventDetail(date, title) {
+  const events = periodData[currentPeriod].events;
+  const ev = events.find(e => e.date === date && e.title === title);
+  if (!ev) return;
+
+  const cfg = typeConfig[ev.type];
+  const dateObj = new Date(ev.date);
+
+  document.getElementById('modalBadge').className = `module-badge ${cfg.color}`;
+  document.getElementById('modalBadge').textContent = cfg.label;
+  document.getElementById('modalDate').textContent = `${dateObj.getFullYear()}年${dateObj.getMonth() + 1}月${dateObj.getDate()}日`;
+  document.getElementById('modalTitle').textContent = ev.title;
+  document.getElementById('modalBody').innerHTML = `
+    <div class="space-y-4">
+      <div>
+        <span class="text-[10px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">${ev.tag}</span>
+      </div>
+      <p class="text-sm text-gray-700 leading-relaxed">${ev.desc}</p>
+      <div class="bg-gray-50 rounded-lg p-3 text-xs text-gray-500">
+        <div class="font-medium text-gray-700 mb-1">关联模块</div>
+        <div class="flex flex-wrap gap-1">
+          ${getRelatedModules(ev.type).map(m => `<span class="px-2 py-0.5 bg-white rounded border text-gray-600">${m}</span>`).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+  document.getElementById('eventModal').classList.remove('hidden');
+}
+
+function getRelatedModules(type) {
+  const map = {
+    brand: ['营销活动', '物料管理', '档期日历'],
+    user: ['会员与社群', '货盘与价格', '执行追踪'],
+    delivery: ['外卖平台', '货盘与价格', '业绩仪表盘'],
+    training: ['训练与稽核', '产品生命周期', '执行追踪'],
+    product: ['产品生命周期', '货盘与价格', '训练与稽核']
+  };
+  return map[type] || [];
+}
+
+function closeModal() {
+  document.getElementById('eventModal').classList.add('hidden');
+}
+
+// Keyboard shortcut
+ document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeModal();
+});
+
+init();
+</script>
+</body>
+</html>
